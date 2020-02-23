@@ -14,12 +14,13 @@ const Hud = ({
 }) => {
   return (
     <>
-      <div style={boxStyle(color)} /> 
-      {isPlaying ?
-        <b> {name}: {money} </b>
-      : 
-        <> {name}: {money} </>
-      }
+      <div style={{fontWeight: isPlaying ? "bold" : null}}>
+        <div style={boxStyle(color)} /> 
+        {name}
+      </div>
+      <div>
+        Money: {money}
+      </div>
     </>
   );
 };

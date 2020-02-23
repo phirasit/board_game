@@ -27,11 +27,10 @@ const Hex = ({
   tile: {
     x, y, pos,
     base: default_base,
-    color: default_color,
   },
-  player,
-  selectedUnit: [selectedUnit, attack, addSelectedUnit, resetSelectedUnit],
-  setMoves,
+  player, turn,
+  selectedUnit: [selectedUnit, attack, resetSelectedUnit],
+  setMoves, setCellUnits
 }) => {
   const { money } = player;
   const [base, setBase] = useState(default_base || null);
@@ -44,9 +43,7 @@ const Hex = ({
       return null;
     }
     let def = base != null ? base.defense : 0;
-    unitArr.forEach(unit => {
-      def += unit.defense;
-    });
+    unitArr.forEach(unit => (def += unit.defense));
     return def;
   }, [units, base]);
 
@@ -75,11 +72,12 @@ const Hex = ({
         player.reduceMoney(unit.getCost());
       }
       unit.pos = pos;
+      unit.lastMovedTurn = turn;
       unit.extractFromHexRef = removeFromHexRef;
       newUnits[unit.id] = unit;
     });
     setUnits(newUnits);
-  }, [units, player, pos]);
+  }, [units, player, pos, turn]);
 
   const addSelectedUnitToHex = useCallback(() => {
     moveUnitToHex(selectedUnit);
@@ -126,7 +124,7 @@ const Hex = ({
             text: `${unit.type} (${unit.cost})`,
             onClick: () => {
               player.reduceMoney(unit.cost);
-              moveUnitToHex([new unit(player)])
+              moveUnitToHex([new unit(player, turn)])
             },
           }))
         )
@@ -140,27 +138,37 @@ const Hex = ({
       console.log(pos, moves);
     }
     return moves;
-  }, [base, units, moveUnitToHex, pos, money, player]);
+  }, [base, units, moveUnitToHex, pos, money, player, turn]);
 
-  const onSelectedHex = useCallback(() => { setMoves(moveSelections); }, [setMoves, moveSelections]);
-  const onClickUnit = useCallback(unit => { addSelectedUnit(unit); }, [addSelectedUnit]);
+  const onSelectedHex = useCallback(() => { 
+    setMoves(moveSelections); 
+    setCellUnits(Object.values(units));
+  }, [setMoves, moveSelections, setCellUnits, units]);
+
   const onAttackHex = useCallback(() => {
     setBase(null);
     setUnits({});
-  }, [setUnits]);
+    setCellUnits([]);
+    selectedUnit
+      .filter(unit => unit.runOnce)
+      .map(unit => unit.removeFromHexRef())
+  }, [setUnits, selectedUnit, setCellUnits]);
 
   const HexOption = useMemo(() => {
     if (selectedUnit.length === 0) return null;
-    if (selectedUnit.some(unit => !unit.reachable(pos))) {
-      return null;
-    }
     if (color == null || color === player.color) {
+      if (selectedUnit.some(unit => !unit.reachable(pos))) {
+        return null;
+      }
       return (
         <Button variant="success" size="sm" onClick={addSelectedUnitToHex}>
           Move
         </Button>
       );
     } else if (attack > defense) {
+      if (selectedUnit.some(unit => !unit.inrange(pos))) {
+        return null;
+      }
       return (
         <Button variant="warning" size="sm" onClick={onAttackHex}>
           Attack
@@ -186,23 +194,17 @@ const Hex = ({
           zIndex: 1, 
           padding: "10px", 
           cursor: "pointer",
+          width: "100%",
+          height: "100%",
         }} onClick={onSelectedHex}>
           <>
             {base && (<> <b> {base.type} </b> <br /> </>)}
-            {defense != null && (<> {`ATK: ${attack} DEF: ${defense}`} <br /> </>)}
-            {Object.values(units).map(unit  => (
-              <div key={unit.id}>
-                {!selectedUnit.includes(unit) ? <>
-                  <div
-                    style={{ cursor: "pointer" }}
-                    onClick={() => onClickUnit(unit)}>
-                    {unit.type}
-                  </div>
-                </> : <>
-                    <b> {unit.type} </b>
-                  </>}
-              </div>
-            ))}
+            {defense != null && (
+              <> 
+                {`ATK: ${attack} DEF: ${defense}`} <br /> 
+                {`Units: ${Object.values(units).length}`}  <br/>
+              </>
+            )}
             {HexOption}
           </>
         </div>
@@ -213,9 +215,10 @@ const Hex = ({
 
 const Map = ({
   width, height,
-  players: { player, player1, player2 },
+  players: { player, turn, player1, player2 },
   selectedUnit,
   setMoves,
+  setCellUnits,
 }) => {
   // game state
   const tiles = useMemo(() => {
@@ -257,8 +260,10 @@ const Map = ({
                   key={`${r}${c}`}
                   tile={tile}
                   player={player}
+                  turn={turn}
                   selectedUnit={selectedUnit}
                   setMoves={setMoves}
+                  setCellUnits={setCellUnits}
                 />
               </td>
             )}
