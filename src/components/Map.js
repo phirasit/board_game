@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import Bases from '../game-engine/Bases.js';
+import Units from '../game-engine/Units.js';
 import { Button } from 'react-bootstrap';
 
 const TileSize = 130;
@@ -29,12 +30,29 @@ const Hex = ({
     base: default_base,
   },
   player, turn,
-  selectedUnit: [selectedUnit, attack, resetSelectedUnit],
+  selectedUnit: [selectedUnit, selectedUnitAttack, resetSelectedUnit],
   setMoves, setCellUnits
 }) => {
   const { money } = player;
   const [base, setBase] = useState(default_base || null);
   const [units, setUnits] = useState({});
+
+  // calculate color
+  const color = useMemo(() => {
+    if (base != null && base.owner != null) {
+      return base.owner.color;
+    }
+    const unitArr = Object.values(units);
+    return unitArr.length > 0 ? unitArr[0].owner.color : null;
+  }, [base, units]);
+
+  // calculate attack
+  const attack = useMemo(() => {
+    const unitArr = Object.values(units);
+    let atk = 0;
+    unitArr.forEach(unit => (atk += unit.attack));
+    return atk;
+  }, [units]);
 
   // calculate defense
   const defense = useMemo(() => {
@@ -66,14 +84,14 @@ const Hex = ({
   const moveUnitToHex = useCallback(additionalUnits => {
     let newUnits = { ...units };
     additionalUnits.forEach(unit => {
-      if (unit.extractFromHexRef != null) {
-        unit.extractFromHexRef.current(unit.id);
+      if (unit.extractFromHex != null) {
+        unit.extractFromHex(unit.id);
       } else {
         player.reduceMoney(unit.getCost());
       }
       unit.pos = pos;
       unit.lastMovedTurn = turn;
-      unit.extractFromHexRef = removeFromHexRef;
+      unit.extractFromHex = () => removeFromHexRef.current();
       newUnits[unit.id] = unit;
     });
     setUnits(newUnits);
@@ -84,14 +102,6 @@ const Hex = ({
     resetSelectedUnit();
   }, [selectedUnit, moveUnitToHex, resetSelectedUnit]);
 
-  const color = useMemo(() => {
-    if (base != null && base.owner != null) {
-      return base.owner.color;
-    }
-    const unitArr = Object.values(units);
-    return unitArr.length > 0 ? unitArr[0].owner.color : null;
-  }, [base, units]);
-
   const moveSelections = useMemo(() => {
     if (base && player.name !== base.owner.name) {
       return [];
@@ -100,13 +110,17 @@ const Hex = ({
     let moves = [];
     const unitArr = Object.values(units);
 
-    if (unitArr.some(unit => unit.type === "engineer") && base === null) {
+    const hasEngineer = unitArr.some(unit => 
+      unit.type === "engineer" && unit.owner.name === player.name
+    );
+
+    if (hasEngineer && base === null) {
       // add all base option
       moves = moves
         .concat(Object.values(Bases)
-          .filter(base => (base.cost <= money))
           .map(base => ({
             text: `${base.type} (${base.cost})`,
+            disabled: base.cost > money,
             onClick: (player) => {
               player.reduceMoney(base.cost);
               setBase(new base(player));
@@ -115,13 +129,13 @@ const Hex = ({
         );
     }
 
-    if (base != null) {
+    if (base != null && base.owner.name === player.name) {
       // add everything related to base
       moves = moves
         .concat(base.units
-          .filter(unit => (unit.cost <= money))
           .map(unit => ({
             text: `${unit.type} (${unit.cost})`,
+            disabled: unit.cost > money,
             onClick: () => {
               player.reduceMoney(unit.cost);
               moveUnitToHex([new unit(player, turn)])
@@ -134,11 +148,8 @@ const Hex = ({
         }]);
     }
 
-    if (moves.length > 0) {
-      console.log(pos, moves);
-    }
     return moves;
-  }, [base, units, moveUnitToHex, pos, money, player, turn]);
+  }, [base, units, moveUnitToHex, money, player, turn]);
 
   const onSelectedHex = useCallback(() => { 
     setMoves(moveSelections); 
@@ -150,9 +161,14 @@ const Hex = ({
     setUnits({});
     setCellUnits([]);
     selectedUnit
-      .filter(unit => unit.runOnce)
-      .map(unit => unit.removeFromHexRef())
-  }, [setUnits, selectedUnit, setCellUnits]);
+      .map(unit => {
+        unit.onAttack(turn);
+        return unit;
+      })
+      .filter(unit => unit.useOnce)
+      .map(unit => unit.extractFromHex());
+    resetSelectedUnit();
+  }, [setUnits, selectedUnit, resetSelectedUnit, setCellUnits, turn]);
 
   const HexOption = useMemo(() => {
     if (selectedUnit.length === 0) return null;
@@ -165,8 +181,8 @@ const Hex = ({
           Move
         </Button>
       );
-    } else if (attack > defense) {
-      if (selectedUnit.some(unit => !unit.inrange(pos))) {
+    } else if (selectedUnitAttack > defense) {
+      if (selectedUnit.some(unit => !unit.inRange(pos))) {
         return null;
       }
       return (
@@ -176,7 +192,7 @@ const Hex = ({
       );
     }
     return null;
-  }, [pos, color, player, addSelectedUnitToHex, onAttackHex, selectedUnit, attack, defense]);
+  }, [pos, color, player, addSelectedUnitToHex, onAttackHex, selectedUnit, selectedUnitAttack, defense]);
 
   return (
     <>
@@ -201,7 +217,7 @@ const Hex = ({
             {base && (<> <b> {base.type} </b> <br /> </>)}
             {defense != null && (
               <> 
-                {`ATK: ${attack} DEF: ${defense}`} <br /> 
+                {`ATK: ${attack >= Units.INF ? `∞` : attack} DEF: ${defense}`} <br /> 
                 {`Units: ${Object.values(units).length}`}  <br/>
               </>
             )}
@@ -233,11 +249,9 @@ const Map = ({
           y: j * TileSize,
         };
         if (i === height - 1 && j === 0) {
-          tile.color = player1.color;
           tile.base = new Bases['City'](player1);
         }
         if (i === 0 && j === width - 1) {
-          tile.color = player2.color;
           tile.base = new Bases['City'](player2);
         }
         data[i].push(tile);

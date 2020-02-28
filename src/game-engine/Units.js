@@ -34,6 +34,10 @@ const UnitType = ({
       return this.cost;
     }
 
+    onAttack(turn) {
+      this.lastMovedTurn = turn;
+    }
+
     reachable(pos) {
       if (this.pos == null) return false;
       let dx = Math.abs(pos[0] - this.pos[0]);
@@ -41,7 +45,7 @@ const UnitType = ({
       return dx + dy <= this.mobility;
     }
 
-    inrange(pos) {
+    inRange(pos) {
       if (this.pos == null) return false;
       let dx = Math.abs(pos[0] - this.pos[0]);
       let dy = Math.abs(pos[1] - this.pos[1]);
@@ -115,5 +119,6 @@ let UnitList = {};
 for (const idx in Units) {
   UnitList[Units[idx].type] = Units[idx];
 }
+UnitList.INF = INF;
 
 export default UnitList;

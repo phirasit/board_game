@@ -7,12 +7,9 @@ import Hud from './components/Hud.js';
 import Map from './components/Map.js';
 import Engine from './game-engine/Engine.js';
 
-const Section = ({isShow, title, content}) => {
-  if (!isShow) {
-    return null;
-  }
+const Section = ({title, content}) => {
   return (
-    <div style={{padding: "5px"}}>
+    <div style={{paddingTop: "10px"}}>
       <b> {title} </b>
       <hr />
       {content}
@@ -48,7 +45,7 @@ const App = () => {
   }, [addSelectedUnit, removeSelectedUnit, units]);
 
   // list of moves
-  const [moves, setMoves] = useState([]);
+  const [moves, setMoves] = useState(null);
   const onNextMove = useCallback(() => { 
     resetSelectedUnit();
     setMoves(null);
@@ -64,20 +61,18 @@ const App = () => {
 
   return (
     <div className="row" style={{ paddingTop: "30px" }}>
-      <div className="col-md-9">
+      <div className="col-md-8">
         <div>
-          <div style={{ padding: "10px" }}>
-            <Map
-              width={5} height={5}
-              players={players}
-              selectedUnit={[units, attack, resetSelectedUnit]}
-              setMoves={setMoves}
-              setCellUnits={setCellUnits}
-            />
-          </div>
+          <Map
+            width={5} height={5}
+            players={players}
+            selectedUnit={[units, attack, resetSelectedUnit]}
+            setMoves={setMoves}
+            setCellUnits={setCellUnits}
+          />
         </div>
       </div>
-      <div className="col-md-3">
+      <div className="col-md-4">
         <div className="row">
           <div className="col-md-6">
             <div>
@@ -99,46 +94,54 @@ const App = () => {
         <hr />
         <div className="row">
           <div className="col-md-6">
-            <Section
-              isShow={moves}
+            {moves && (<Section
               title={"List of usable moves"}
               content={
                 <div>
-                  {moves && moves.map(({ text, onClick }) => (
+                  {moves.map(({ text, disabled, onClick }) => (
                     <div key={text} style={{ marginTop: "5px", marginBottom: "5px" }}>
-                      <Button variant="info" size="sm" onClick={onClickOption(onClick)}>
+                      <Button 
+                        disabled={disabled}
+                        variant="info" size="sm"
+                        onClick={onClickOption(onClick)}> 
                         {text}
                       </Button>
                     </div>
                   ))}
                 </div>
-              } />
+              } />)}
           </div>
           <div className="col-md-6">
-            <Section
-              isShow={cellUnits}
+            {cellUnits && (<Section
               title={`Unit in the cell`}
               content={
                 <div>
-                  {cellUnits && cellUnits.map(unit => (
-                    <div key={unit.id}>
-                      <Button 
-                        disabled={turn === unit.lastMovedTurn}
-                        variant={ units.includes(unit) ? "secondary" : "outline-secondary"}
-                        size="sm"
-                        onClick={() => onClickCellUnit(unit)}>
-                        {unit.type}
-                      </Button>
-                    </div>
-                  ))}
+                  {cellUnits.map(unit => {
+                    const disabled = turn === unit.lastMovedTurn || unit.owner.name !== player.name;
+                    return (
+                      <div key={unit.id}>
+                        <Button 
+                          disabled={disabled}
+                          variant={ units.includes(unit) ? "secondary" : "outline-secondary"}
+                          size="sm"
+                          onClick={() => onClickCellUnit(unit)}>
+                          {disabled
+                            ? (
+                              <div style={{ textDecorationLine: 'line-through' }}>
+                                {unit.type}
+                              </div>
+                            ) : unit.type
+                          }
+                        </Button>
+                      </div>);
+                  })}
                 </div>
-              } />
+              } />)}
           </div>
         </div>
         <div className="row">
           <div className="col-md-12">
-            <Section
-              isShow={units.length > 0}
+            {units && units.length > 0 && (<Section
               title={
                 <>
                   List of selected Units 
@@ -161,13 +164,12 @@ const App = () => {
                     Cancel Selection
               </Button>
                 </div>
-              } />
+              } />)}
           </div>
         </div>
         <div className="row">
           <div className="col-md-12">
             <Section
-              isShow={true}
               title={"Other options"}
               content={
                 <div>
