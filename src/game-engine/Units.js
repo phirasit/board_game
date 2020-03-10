@@ -9,6 +9,8 @@ const UnitType = ({
   mobility, 
   range,
   useOnce = false,
+  attackAfterMove = false,
+  airborne = false,
 }) => {
   return class {
     static type = type;
@@ -25,7 +27,9 @@ const UnitType = ({
       this.range = range;
       this.useOnce = useOnce;
       this.lastMovedTurn = turn;
-
+      this.lastAttackedTurn = turn;
+      this.attackAfterMove = attackAfterMove;
+      this.airborne = airborne;
       this.id = global_id++;
       this.owner = player;
     }
@@ -34,22 +38,55 @@ const UnitType = ({
       return this.cost;
     }
 
-    onAttack(turn) {
+    onMove(turn) {
       this.lastMovedTurn = turn;
     }
 
-    reachable(pos) {
-      if (this.pos == null) return false;
-      let dx = Math.abs(pos[0] - this.pos[0]);
-      let dy = Math.abs(pos[1] - this.pos[1]);
-      return dx + dy <= this.mobility;
+    onAttack(turn) {
+      this.lastMovedTurn = turn;
+      this.lastAttackedTurn = turn;
     }
 
-    inRange(pos) {
-      if (this.pos == null) return false;
-      let dx = Math.abs(pos[0] - this.pos[0]);
-      let dy = Math.abs(pos[1] - this.pos[1]);
-      return dx + dy <= this.range;
+    samePos(pos1, pos2) {
+      return pos1[0] === pos2[0] && pos1[1] === pos2[1];
+    }
+
+    withInRange(tile, step, useRoad = false) {
+      const ownerName = this.owner.name;
+      let inRangeTiles = [this.tile];
+      for (let i = 0; i < step; ++i) {
+        let nwInRangeTiles = [...inRangeTiles]
+        function expand(tile) {
+          if (tile.owner && tile.owner.name !== ownerName) return;
+          tile.neighbor.forEach(tile2 => {
+            if (airborne) {
+              if (tile2.base && tile2.base.antimissile && tile2.base.owner.name !== ownerName) {
+                return;
+              }
+              if (tile2.neighbor.some(tile3 => tile3.base && tile3.base.antimissile && tile3.base.owner.name !== ownerName)) {
+                return;
+              }
+            }
+            if (nwInRangeTiles.indexOf(tile2) === -1) {
+              nwInRangeTiles.push(tile2);
+              if (useRoad && tile2.base && tile2.base.isRoad) {
+                expand(tile2)
+              }
+            }
+          })
+        }
+        inRangeTiles.forEach(tile => expand(tile))
+        inRangeTiles = [...nwInRangeTiles]
+      }
+      return inRangeTiles.some(t => this.samePos(t.pos, tile.pos))
+    }
+
+    reachable(tile) {
+      return this.withInRange(tile, this.mobility, true)
+    }
+
+    inRange(tile) {
+      return this.withInRange(tile, this.range, false);
     }
   };
 }
@@ -82,7 +119,7 @@ const Units = [
   UnitType({
     type: "balistic tank", 
     cost: 3, 
-    attack: 4, 
+    attack: 2, 
     defense: 1,
     mobility: 1,
     range: 2,
@@ -94,6 +131,8 @@ const Units = [
     defense: 2,
     mobility: 5,
     range: 1,
+    attackAfterMove: true,
+    airborne: true,
   }),
   UnitType({
     type: "short-range missile", 
@@ -103,6 +142,7 @@ const Units = [
     mobility: 1,
     range: 2,
     useOnce: true,
+    airborne: true,
   }),
   UnitType({
     type: "nuke", 
@@ -112,6 +152,7 @@ const Units = [
     mobility: -1,
     range: INF,
     useOnce: true,
+    airborne: true,
   }),
 ];
 

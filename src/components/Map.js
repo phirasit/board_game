@@ -25,26 +25,29 @@ const BackGroundImg = ({ x, y, color }) => (
 );
 
 const Hex = ({
-  tile: {
-    x, y, pos,
-    base: default_base,
-  },
+  tile,
   player, turn,
   selectedUnit: [selectedUnit, selectedUnitAttack, resetSelectedUnit],
   setMoves, setCellUnits
 }) => {
+  const {
+    x, y, 
+    base: default_base,
+    units: default_units,
+  } = tile;
   const { money } = player;
   const [base, setBase] = useState(default_base || null);
-  const [units, setUnits] = useState({});
+  const [units, setUnits] = useState(default_units || {});
 
   // calculate color
-  const color = useMemo(() => {
+  const owner = useMemo(() => {
     if (base != null && base.owner != null) {
-      return base.owner.color;
+      return base.owner;
     }
     const unitArr = Object.values(units);
-    return unitArr.length > 0 ? unitArr[0].owner.color : null;
-  }, [base, units]);
+    return unitArr.length > 0 ? unitArr[0].owner : null;
+  }, [base, units])
+  const color = owner ? owner.color : null;
 
   // calculate attack
   const attack = useMemo(() => {
@@ -75,10 +78,10 @@ const Hex = ({
     })
     return newUnits;
   }, [selectedUnit, units])
-  const removeFromHexRef = useRef();
   useEffect(() => {
-    removeFromHexRef.current = () => setUnits(newUnitList);
-  }, [newUnitList, setUnits]);
+    const unitArr = Object.values(units);
+    unitArr.forEach(unit => unit.extractFromHex = () => setUnits(newUnitList))
+  }, [newUnitList, units, setUnits]);
 
   // move operation
   const moveUnitToHex = useCallback(additionalUnits => {
@@ -89,21 +92,26 @@ const Hex = ({
       } else {
         player.reduceMoney(unit.getCost());
       }
-      unit.pos = pos;
-      unit.lastMovedTurn = turn;
-      unit.extractFromHex = () => removeFromHexRef.current();
+      unit.tile = tile;
+      unit.onMove(turn);
       newUnits[unit.id] = unit;
     });
     setUnits(newUnits);
-  }, [units, player, pos, turn]);
+  }, [units, player, tile, turn]);
 
   const addSelectedUnitToHex = useCallback(() => {
     moveUnitToHex(selectedUnit);
     resetSelectedUnit();
   }, [selectedUnit, moveUnitToHex, resetSelectedUnit]);
 
+  // cache
+  useEffect(() => {
+    tile.base = base;
+    tile.owner = owner;
+  }, [tile, base, owner])
+
   const moveSelections = useMemo(() => {
-    if (base && player.name !== base.owner.name) {
+    if (base && !base.sameSide(player)) {
       return [];
     }
 
@@ -129,7 +137,7 @@ const Hex = ({
         );
     }
 
-    if (base != null && base.owner.name === player.name) {
+    if (base != null && base.sameSide(player)) {
       // add everything related to base
       moves = moves
         .concat(base.units
@@ -172,27 +180,33 @@ const Hex = ({
 
   const HexOption = useMemo(() => {
     if (selectedUnit.length === 0) return null;
-    if (color == null || color === player.color) {
-      if (selectedUnit.some(unit => !unit.reachable(pos))) {
-        return null;
+    let move = null;
+    if (!owner || owner.name === player.name) {
+      if (selectedUnit.every(unit => unit.reachable(tile) && turn > unit.lastMovedTurn)) {
+        move = (
+          <Button variant="success" size="sm" onClick={addSelectedUnitToHex}>
+            Move
+          </Button>
+        );
       }
-      return (
-        <Button variant="success" size="sm" onClick={addSelectedUnitToHex}>
-          Move
-        </Button>
-      );
-    } else if (selectedUnitAttack > defense) {
-      if (selectedUnit.some(unit => !unit.inRange(pos))) {
-        return null;
+    } 
+    let attack = null;
+    if (selectedUnitAttack > defense && ((owner && owner.name !== player.name) || (!owner && base))) { 
+      if (selectedUnit.every(unit => unit.inRange(tile))) {
+        attack = (
+          <Button variant="warning" size="sm" onClick={onAttackHex}>
+            Attack
+          </Button>
+        );
       }
-      return (
-        <Button variant="warning" size="sm" onClick={onAttackHex}>
-          Attack
-        </Button>
-      );
     }
-    return null;
-  }, [pos, color, player, addSelectedUnitToHex, onAttackHex, selectedUnit, selectedUnitAttack, defense]);
+    return (
+      <>
+        {move}
+        {attack}
+      </>
+    );
+  }, [owner, base, player, tile, addSelectedUnitToHex, onAttackHex, selectedUnit, selectedUnitAttack, defense]);
 
   return (
     <>
@@ -239,6 +253,7 @@ const Map = ({
   // game state
   const tiles = useMemo(() => {
     let data = [];
+    console.log('init', height, width, player1, player2);
     for (let i = 0; i < height; ++i) {
       data.push([]);
       for (let j = 0; j < width; ++j) {
@@ -247,18 +262,40 @@ const Map = ({
           pos: [i, j],
           x: i * TileSize,
           y: j * TileSize,
+          neighbor: [],
         };
         if (i === height - 1 && j === 0) {
           tile.base = new Bases['City'](player1);
+          const eng = new Units["engineer"](player1, -1);
+          eng.tile = tile 
+          tile.units = {[eng.id]: eng}
         }
         if (i === 0 && j === width - 1) {
           tile.base = new Bases['City'](player2);
+          const eng = new Units["engineer"](player2, -1);
+          eng.tile = tile
+          tile.units = {[eng.id]: eng}
         }
         data[i].push(tile);
       }
     }
+
+    // set neighbor
+    for (let i = 0; i < height; ++i) {
+      for (let j = 0; j < width; ++j) {
+        if (j+1 < width) {
+          data[i][j].neighbor.push(data[i][j+1]);
+          data[i][j+1].neighbor.push(data[i][j]);
+        }
+        if (i+1 < height) {
+          data[i][j].neighbor.push(data[i+1][j]);
+          data[i+1][j].neighbor.push(data[i][j]);
+        }
+      }
+    }
+
     return data;
-  }, [width, height, player1, player2]);
+  }, [width, height]);
 
   return (
     <table style={{

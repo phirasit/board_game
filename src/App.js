@@ -117,7 +117,11 @@ const App = () => {
               content={
                 <div>
                   {cellUnits.map(unit => {
-                    const disabled = turn === unit.lastMovedTurn || unit.owner.name !== player.name;
+                    const disabled = 
+                      ((turn === unit.lastMovedTurn) && 
+                       !(turn > unit.lastAttackedTurn && unit.attackAfterMove)
+                      ) || unit.owner.name !== player.name;
+                    console.log(turn, unit.lastAttackedTurn, unit.attackAfterMove)
                     return (
                       <div key={unit.id}>
                         <Button 
@@ -155,7 +159,7 @@ const App = () => {
                     {units.map(unit => (
                       <div key={unit.id}>
                         <li>
-                          {`${unit.type} #${unit.pos[0]},${unit.pos[1]}`}
+                          {`${unit.type} #${unit.tile.pos[0]},${unit.tile.pos[1]}`}
                         </li>
                       </div>
                     ))}
