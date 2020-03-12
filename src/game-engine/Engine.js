@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import Player from "./Player.js";
 
 const useBoardGame = () => {
@@ -15,11 +15,7 @@ const useBoardGame = () => {
   const nextMove = useCallback(() => { 
     setTurn(!turn);
     setTurnNum(turnNum+1);
-    (player === player1 ? player2 : player1).addMoney(); 
-  }, [turn, player, player1, player2, turnNum, setTurnNum]);
-
-  useEffect(() => { player.addMoney(); }, []);
-
+  }, [turn, turnNum]);
 
   return {
     players: { player, turn: turnNum, player1, player2, },

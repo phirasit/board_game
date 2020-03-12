@@ -21,6 +21,9 @@ const App = () => {
   const {players, nextMove} = Engine.useBoardGame();
   const {player, turn, player1, player2} = players;
 
+  // auto select tile
+  const selectedTile = useState(null);
+
   // list of selected units
   const [units, setUnits] = useState([]);
   const attack = useMemo(() => {
@@ -69,6 +72,7 @@ const App = () => {
             selectedUnit={[units, attack, resetSelectedUnit]}
             setMoves={setMoves}
             setCellUnits={setCellUnits}
+            selectedTile={selectedTile}
           />
         </div>
       </div>

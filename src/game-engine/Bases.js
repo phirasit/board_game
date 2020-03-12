@@ -10,16 +10,19 @@ const BaseType = ({
   isRoad = false,
   noOnwer = false, 
   antimissile = false,
+  money = 0,
 }) => {
   return class {
     static type = name;
     static cost = cost;
     static units = units;
+    static money = money;
 
     constructor(player) {
       this.type = name;
       this.cost = cost;
       this.units = units;
+      this.money = money;
       if (!noOnwer) {
         this.owner = player;
       }
@@ -47,7 +50,8 @@ const Bases = [
     name: "City", 
     cost: 10, 
     defense: 5,
-    units: [Units["engineer"], Units["soldier"]]
+    units: [Units["engineer"], Units["soldier"]],
+    money: 2,
   }),
   BaseType({
     name: "Millitary", 

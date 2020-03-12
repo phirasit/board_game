@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Bases from '../game-engine/Bases.js';
 import Units from '../game-engine/Units.js';
 import { Button } from 'react-bootstrap';
@@ -28,7 +28,8 @@ const Hex = ({
   tile,
   player, turn,
   selectedUnit: [selectedUnit, selectedUnitAttack, resetSelectedUnit],
-  setMoves, setCellUnits
+  setMoves, setCellUnits,
+  selectedTile: [selectedTile, setSelectedTile],
 }) => {
   const {
     x, y, 
@@ -38,6 +39,14 @@ const Hex = ({
   const { money } = player;
   const [base, setBase] = useState(default_base || null);
   const [units, setUnits] = useState(default_units || {});
+
+  // add money
+  useEffect(() => {
+    if (base && base.sameSide(player)) {
+      player.addMoney(base.money); 
+    }
+    return () => {};
+  }, [turn]);
 
   // calculate color
   const owner = useMemo(() => {
@@ -162,7 +171,15 @@ const Hex = ({
   const onSelectedHex = useCallback(() => { 
     setMoves(moveSelections); 
     setCellUnits(Object.values(units));
-  }, [setMoves, moveSelections, setCellUnits, units]);
+    setSelectedTile(tile);
+  }, [setMoves, moveSelections, setCellUnits, units, tile, setSelectedTile]);
+
+  // auto select
+  useEffect(() => {
+    if (selectedTile === tile) {
+      onSelectedHex();
+    }
+  }, [selectedTile, tile, onSelectedHex])
 
   const onAttackHex = useCallback(() => {
     setBase(null);
@@ -206,7 +223,7 @@ const Hex = ({
         {attack}
       </>
     );
-  }, [owner, base, player, tile, addSelectedUnitToHex, onAttackHex, selectedUnit, selectedUnitAttack, defense]);
+  }, [owner, base, turn, player, tile, addSelectedUnitToHex, onAttackHex, selectedUnit, selectedUnitAttack, defense]);
 
   return (
     <>
@@ -249,6 +266,7 @@ const Map = ({
   selectedUnit,
   setMoves,
   setCellUnits,
+  selectedTile,
 }) => {
   // game state
   const tiles = useMemo(() => {
@@ -315,6 +333,7 @@ const Map = ({
                   selectedUnit={selectedUnit}
                   setMoves={setMoves}
                   setCellUnits={setCellUnits}
+                  selectedTile={selectedTile}
                 />
               </td>
             )}

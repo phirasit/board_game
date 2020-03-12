@@ -119,15 +119,15 @@ const Units = [
   UnitType({
     type: "balistic tank", 
     cost: 3, 
-    attack: 2, 
-    defense: 1,
+    attack: 4, 
+    defense: 2,
     mobility: 1,
     range: 2,
   }),
   UnitType({
     type: "jet fighter", 
     cost: 5, 
-    attack: 4, 
+    attack: 5, 
     defense: 2,
     mobility: 5,
     range: 1,
@@ -152,7 +152,6 @@ const Units = [
     mobility: -1,
     range: INF,
     useOnce: true,
-    airborne: true,
   }),
 ];
 
